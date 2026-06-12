@@ -1,0 +1,7 @@
+# Fichiers à ignorer
+__pycache__/
+chroma_db/
+chroma_db_fresh/
+venv/
+*.pyc
+*.csv

@@ -1,0 +1,12 @@
+pandas
+langchain-core
+langchain-community
+langchain-text-splitters
+langchain-chroma
+langchain-ollama
+langchain-huggingface
+chromadb
+sentence-transformers
+bert-score
+rouge-score
+nltk
