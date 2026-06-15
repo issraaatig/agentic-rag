@@ -1,38 +1,23 @@
-import os
+from langchain_ollama import OllamaLLM
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
 import uuid
 
-# =========================
-# SESSION
-# =========================
 SESSION_ID = str(uuid.uuid4())
 USER_ID = "med-rag-user"
 
-
-# =========================
-# LLM (OLLAMA)
-# =========================
-from langchain_ollama import OllamaLLM
-
+# LLM
 llm = OllamaLLM(
-    model="llama3.2:latest",
+    model="phi3:latest",
     temperature=0.2
 )
 
-
-# =========================
-# VECTOR STORE (LOAD EXISTANT)
-# =========================
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_chroma import Chroma
+# Embeddings (CHOISIR UNE SEULE FOIS ET NE PLUS CHANGER)
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
 
 PERSIST_DIR = "./chroma_db_fresh"
-
-# IMPORTANT: mêmes embeddings que vector.py
-from langchain_ollama import OllamaEmbeddings
-
-embeddings = OllamaEmbeddings(
-    model="mxbai-embed-large"
-)
 
 vector_store = Chroma(
     persist_directory=PERSIST_DIR,

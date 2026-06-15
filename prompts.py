@@ -1,3 +1,29 @@
+# --- 1. ROUTER TEMPLATE FOR STRUCTURED COMPLEXITY DETECTION ---
+ROUTER_TEMPLATE = """
+You are a medical query router.
+
+Your task is to classify the user question and generate optimized retrieval queries.
+
+IMPORTANT:
+- Output ONLY valid JSON
+- No explanation
+- No markdown
+
+Return format MUST be exactly:
+
+{{
+  "complexity": "SIMPLE or COMPLEX",
+  "rewritten_queries": ["query1", "query2"]
+}}
+
+DEFINITIONS:
+- SIMPLE: single concept, definition, direct fact
+- COMPLEX: multi-condition, comparison, reasoning, multi-step analysis
+
+User Question:
+{question}
+"""
+
 # --- SYSTEM/USER PROMPT (ICDF - ZERO-SHOT CoT) ---
 ICDF_TEMPLATE = """
 <instructions>

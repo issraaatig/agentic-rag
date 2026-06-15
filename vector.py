@@ -32,9 +32,10 @@ chunks = text_splitter.split_documents(documents)
 # ==========================================
 # 3. VECTORIZATION & LOCAL STORAGE (CHROMA)
 # ==========================================
-embeddings = OllamaEmbeddings(
-    model="mxbai-embed-large"
-)
+from langchain_huggingface import HuggingFaceEmbeddings
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2" )
+
 
 vector_store = Chroma.from_documents(
     documents=chunks,
