@@ -43,4 +43,4 @@ vector_store = Chroma.from_documents(
     persist_directory="./chroma_db_fresh"
 )
 
-retriever = vector_store.as_retriever(search_kwargs={"k": 5})
+retriever = vector_store.as_retriever(search_kwargs={"k": 2})

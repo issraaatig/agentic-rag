@@ -41,12 +41,17 @@ def run_automated_evaluation(input_csv="questions.csv", output_csv="evaluation_r
                 source_attendue = row['Source_ideale_chercheuse']
                 reponse_attendue = row['Reponse_ideale_chercheuse']
                 
-                print(f"\n[{idx + 1}/{total_questions}] {question}")
-
+                print(f"[*] Traitement automatique Question {id_q}/{total_questions} ")
                 
-            
+                # Ajout d'une temporisation à partir de la 2ème question pour éviter la saturation TPM/TPD
+                if idx > 0:
+                    print("⏳ Temporisation de sécurité (4 secondes) pour préserver les quotas de l'API...")
+                    time.sleep(4)
+                
                 try:
+                    # Intégration stricte de votre logique d'observabilité Langfuse (identique à main.py)
                     
+                        
                             
                             start_perf = time.time()
                             ttft = None
@@ -55,16 +60,9 @@ def run_automated_evaluation(input_csv="questions.csv", output_csv="evaluation_r
 
                             # --- 1. GESTION DU ROUTAGE AVEC REPLI SÉCURISÉ ---
                             try:
-                                route_result = main.router_chain.invoke({"question": question})
+                                route_result: str = main.router_chain.invoke({"question": question})
                                 is_complex = route_result.complexity == "COMPLEX"
-                                raw_queries = route_result.rewritten_queries
-
-                                if isinstance(raw_queries, dict):
-                                    queries_to_run = list(raw_queries.values())
-                                elif isinstance(raw_queries, list):
-                                    queries_to_run = raw_queries
-                                else:
-                                    queries_to_run = [str(raw_queries)]
+                                queries_to_run = route_result.rewritten_queries
                             except Exception as tool_err:
                                 # Repli si l'appel d'outil échoue (ex: Question 1)
                                 print(f"ℹ️ Repli du routeur activé pour la Q{id_q}")
@@ -74,7 +72,7 @@ def run_automated_evaluation(input_csv="questions.csv", output_csv="evaluation_r
                             # Stratégie de récupération adaptative (Standard ou Fusion RRF)
                             if is_complex:
                                 all_results = [config.retriever.invoke(q) for q in queries_to_run]
-                                docs = main.reciprocal_rank_fusion(all_results)[:5]
+                                docs = main.reciprocal_rank_fusion(all_results)[:2]
                             else:
                                 docs = config.retriever.invoke(question)
 
@@ -82,7 +80,7 @@ def run_automated_evaluation(input_csv="questions.csv", output_csv="evaluation_r
                             context_combined = "\n".join([d.page_content for d in docs])
 
                             # Exécution de votre chaîne de génération ICDF avec les bonnes variables de clés {'context', 'question'}
-                            for chunk in main.rag_chain.stream(question):
+                            for chunk in main.rag_chain.stream({"context": context_combined, "question": question}):
                                 if ttft is None:
                                     ttft = time.time() - start_perf 
                                 final_answer += chunk
@@ -109,10 +107,10 @@ def run_automated_evaluation(input_csv="questions.csv", output_csv="evaluation_r
 
                             # --- 3. APPEL DE VOS JUGES LLM (Avec gestion de pause pour éviter le Rate Limit) ---
                             time.sleep(1) # Courte pause avant les juges
-                            context_precision = metrics.get_judge_score(config.llm ,prompts.CONTEXT_PRECISION_PROMPT.format(question=question, context=context_combined))
-                            context_recall = metrics.get_judge_score(config.llm ,prompts.CONTEXT_RECALL_PROMPT.format(question=question, context=context_combined))
-                            faith_score = metrics.get_judge_score(config.llm ,prompts.FAITHFULNESS_PROMPT.format(answer=final_answer, context=context_combined))
-                            answer_relevance = metrics.get_judge_score(config.llm ,prompts.ANSWER_RELEVANCE_PROMPT.format(question=question, answer=final_answer))
+                            context_precision = metrics.get_judge_score(config.llm, prompts.CONTEXT_PRECISION_PROMPT.format(question=question, context=context_combined))
+                            context_recall = metrics.get_judge_score(config.llm, prompts.CONTEXT_RECALL_PROMPT.format(question=question, context=context_combined))
+                            faith_score = metrics.get_judge_score(config.llm, prompts.FAITHFULNESS_PROMPT.format(answer=final_answer, context=context_combined))
+                            answer_relevance = metrics.get_judge_score(config.llm, prompts.ANSWER_RELEVANCE_PROMPT.format(question=question, answer=final_answer))
 
                             # Métriques lexicales et sémantiques basées sur la réponse attendue (Ground Truth)
                             lexical_f1 = metrics.calculate_lexical_f1(reponse_attendue, final_answer)
@@ -124,7 +122,6 @@ def run_automated_evaluation(input_csv="questions.csv", output_csv="evaluation_r
                             else:
                                 f1_retrieval = 0.0
 
-                            
                             
 
                             # --- 6. ÉCRITURE DANS LE FICHIER CSV DE SORTIE ---
@@ -144,11 +141,13 @@ def run_automated_evaluation(input_csv="questions.csv", output_csv="evaluation_r
                                 'F1_Score_Sources_Citees': lexical_f1
                             })
 
-                except Exception:
-                    import traceback
-                    traceback.print_exc()
+                except Exception as e:
+                    print(f"⚠️ Erreur lors du traitement de la question {id_q}: {e}")
                     
-    
+    # Forcer la synchronisation avec Langfuse avant la fermeture
+    config.langfuse.flush()
+    print(f"\n>>> ✅ ÉVALUATION TERMINÉE AVEC SUCCÈS ! <<<")
+    print(f"📊 Fichier d'analyse généré : '{output_csv}'")
 
 if __name__ == "__main__":
     run_automated_evaluation()
