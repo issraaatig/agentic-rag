@@ -1,6 +1,12 @@
 import os
 import uuid
+from langchain_ollama import OllamaLLM
+from langchain_chroma import Chroma
 
+# 1. TABLEAU BLANC (Variable d'environnement)
+# ==========================================
+OLLAMA_BASE_URL = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+print(f"🔗 config.py -> Connexion à Ollama sur : {OLLAMA_BASE_URL}")
 # =========================
 # SESSION
 # =========================
@@ -14,7 +20,8 @@ USER_ID = "med-rag-user"
 from langchain_ollama import OllamaLLM
 
 llm = OllamaLLM(
-    model="llama3.2:latest",
+    model="phi3:latest",
+    base_url=OLLAMA_BASE_URL ,
     temperature=0.2
 )
 
@@ -25,13 +32,14 @@ llm = OllamaLLM(
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
-PERSIST_DIR = "./chroma_db_fresh"
+PERSIST_DIR = "/app/chroma_db"
 
 # IMPORTANT: mêmes embeddings que vector.py
 from langchain_ollama import OllamaEmbeddings
 
 embeddings = OllamaEmbeddings(
-    model="mxbai-embed-large"
+    model="mxbai-embed-large",
+    base_url=OLLAMA_BASE_URL
 )
 
 vector_store = Chroma(

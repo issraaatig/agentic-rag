@@ -1,0 +1,10 @@
+pandas
+
+langchain-core
+langchain-text-splitters
+langchain-chroma
+langchain-ollama
+chromadb
+langchain-huggingface
+
+pydantic
