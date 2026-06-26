@@ -14,7 +14,7 @@ USER_ID = "med-rag-user"
 from langchain_ollama import OllamaLLM
 
 llm = OllamaLLM(
-    model="llama3.2:latest",
+    model="qwen2.5:1.5b",
     temperature=0.2
 )
 
