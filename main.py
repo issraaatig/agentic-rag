@@ -136,10 +136,7 @@ def run_interaction_loop():
                 final_answer
             )
 
-            bert_f1 = metrics.calculate_bert_score(
-                context_combined,
-                final_answer
-            )
+            
 
             # =========================
             # OUTPUT
@@ -150,7 +147,7 @@ def run_interaction_loop():
             print(f"⏱️ PERF : TTFT: {ttft:.3f}s | TPS: {tps:.1f} tok/s")
             print(f"📊 RETRIEVAL : Context Precision: {context_precision:.2f} | Context Recall: {context_recall:.2f}")
             print(f"📊 GENERATION : Faithfulness: {faith_score:.2f} | Answer Relevance: {answer_relevance:.2f}")
-            print(f"📊 ALIGNMENT : BERT-F1: {bert_f1:.3f} | Lexical-F1: {lexical_f1:.3f}")
+            print(f"📊 ALIGNMENT : Lexical-F1: {lexical_f1:.3f}")
             print("=" * 60)
 
         except Exception as e:
