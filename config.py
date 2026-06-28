@@ -22,7 +22,7 @@ llm = OllamaLLM(
 # =========================
 # VECTOR STORE (LOAD EXISTANT)
 # =========================
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
 
 PERSIST_DIR = "./chroma_db_fresh"
