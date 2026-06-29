@@ -5,3 +5,5 @@ chroma_db_fresh/
 venv/
 *.pyc
 *.csv
+.env
+*.env
