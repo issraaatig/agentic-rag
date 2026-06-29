@@ -1,4 +1,4 @@
-from bert_score import score as bert_score_func
+#from bert_score import score as bert_score_func
 import re 
 def get_judge_score(llm, prompt_text):
     """
