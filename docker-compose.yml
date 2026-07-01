@@ -3,7 +3,7 @@ version: '3.8'
 services:
   ollama:
     build: ./ollama
-    container_name: ollama-server
+    container_name: ollama
     ports:
       - "11434:11434"
     volumes:
@@ -19,7 +19,7 @@ services:
       - ollama
     volumes:
       - ./data:/app/data                 # Monte le CSV
-      - ./chroma_db_fresh:/app/chroma_db # 🔥 Monte UNIQUEMENT le dossier fresh
+      - ./chroma_db_fresh:/app/chroma_db #  Monte UNIQUEMENT le dossier fresh
       - ./app:/app                       # Pour le Live Coding (synchronisation du code)
     environment:
       - OLLAMA_HOST=http://ollama:11434  # Tableau blanc

@@ -4,7 +4,8 @@ FROM ollama/ollama:latest
 COPY start.sh /start.sh
 COPY .env .env
 
-RUN chmod +x /start.sh
+RUN chmod +x /start.sh && sed -i 's/\r$//' /start.sh
 
-# Set the entrypoint
-ENTRYPOINT ["/start.sh"]
+# Set the entrypoint 
+#Dès que le conteneur démarre,exécute automatiquement
+ENTRYPOINT ["/start.sh"]  

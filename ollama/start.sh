@@ -6,15 +6,16 @@ ollama serve &
 
 # Wait for the service to initialize
 echo "Waiting for ollama service to initialize..."
-sleep 10
+sleep 10   #le temps pour finir ollama serve 
 
-# Run the deepseek model
-echo "Running the LLM model..."
-ollama run $(cat .env | grep MODEL | cut -d '=' -f2)
+echo "Loading environment..."
+source .env
 
-# Run the Embedding model
-echo "Running the Embedding model..."
-ollama run $(cat .env | grep EMBEDDING_MODEL | cut -d '=' -f2)
+echo "Pulling LLM model: $MODEL"
+ollama pull "$MODEL"
+
+echo "Pulling embedding model: $EMBEDDING_MODEL"
+ollama pull "$EMBEDDING_MODEL"
 
 # Keep the container running
 tail -f /dev/null
