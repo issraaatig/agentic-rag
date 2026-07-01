@@ -16,7 +16,12 @@ print(f"🔗 vector.py -> Connexion à Ollama sur : {OLLAMA_BASE_URL}")
 # 2. DATA LOADING & PREPARATION
 # ==========================================
 print("📖 Lecture du CSV...")
-df = pd.read_csv("/data/medquad_cvd_final.csv")
+import os
+
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+csv_path = os.path.join(BASE_DIR, "data", "medquad_cvd_final.csv")
+
+df = pd.read_csv(csv_path)
 print(f"✅ CSV chargé : {len(df)} lignes")
 
 print("📝 Création des documents...")
