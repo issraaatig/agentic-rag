@@ -8,3 +8,6 @@ chromadb
 langchain-huggingface
 
 pydantic
+
+fastapi
+uvicorn

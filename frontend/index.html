@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agentic RAG · Medical AI Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          medblue: { 50:'#EEF4FF', 100:'#DCE8FF', 400:'#5B8DEF', 500:'#2F6FED', 600:'#1F56C9', 700:'#173F94' },
+          panel: { DEFAULT:'#0B1310', grid:'rgba(70,209,144,0.07)' },
+          phosphor: { DEFAULT:'#3FBF8A', bright:'#6BE3AC' },
+          side: { DEFAULT:'#15181C', soft:'#1D2126', line:'#262A30' },
+          vital: '#C4573F',
+        },
+        fontFamily: {
+          serif: ['Fraunces','serif'],
+          sans: ['Inter','ui-sans-serif','system-ui'],
+          mono: ['IBM Plex Mono','ui-monospace'],
+        },
+        boxShadow: {
+          soft: '0 1px 2px rgba(20,30,25,0.04), 0 10px 28px rgba(20,30,25,0.06)',
+          card: '0 20px 50px -12px rgba(20,30,45,0.18)',
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { height: 100%; }
+  body { font-family: 'Inter', sans-serif; }
+  ::selection { background: #3FBF8A; color: #fff; }
+
+  #loginScreen { transition: opacity 0.5s ease, transform 0.5s ease; }
+  #loginScreen.fade-out { opacity: 0; transform: scale(1.02); pointer-events: none; }
+  #appScreen { opacity: 0; transition: opacity 0.5s ease 0.15s; }
+  #appScreen.visible { opacity: 1; }
+
+  #sidebar { transition: width 0.25s ease, opacity 0.2s ease; }
+  #sidebar.collapsed { width: 0 !important; opacity: 0; overflow: hidden; }
+
+  .ecg-track { animation: ecg-scroll 7s linear infinite; }
+  @keyframes ecg-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .status-dot.online { animation: dot-pulse 2s ease-in-out infinite; }
+  .status-dot.checking { animation: dot-pulse 1s ease-in-out infinite; }
+  @keyframes dot-pulse { 0%,100% { opacity:1 } 50% { opacity:0.35 } }
+
+  .entry { animation: entry-in 0.35s ease both; }
+  @keyframes entry-in { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: translateY(0); } }
+
+  .typing-ecg path {
+    fill:none; stroke:#1F8F5E; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round;
+    stroke-dasharray:130; stroke-dashoffset:130; animation: ecg-draw 1.3s linear infinite;
+  }
+  @keyframes ecg-draw { to { stroke-dashoffset:-130; } }
+
+  .prose-msg p { margin: 0 0 10px; }
+  .prose-msg p:last-child { margin-bottom: 0; }
+  .prose-msg code { font-family:'IBM Plex Mono',monospace; font-size:13px; background:#E4F0E8; padding:1px 5px; border-radius:4px; }
+  .prose-msg pre { background:#0B1310; color:#D9E6DF; padding:14px 16px; border-radius:8px; overflow-x:auto; font-family:'IBM Plex Mono',monospace; font-size:12.5px; }
+  .prose-msg pre code { background:none; padding:0; }
+  .prose-msg ul, .prose-msg ol { margin:0 0 10px; padding-left:20px; }
+  .prose-msg a { color:#1F8F5E; text-decoration:underline; }
+
+  #chatMain::-webkit-scrollbar { width: 8px; }
+  #chatMain::-webkit-scrollbar-thumb { background: #DEE2D8; border-radius: 8px; }
+  .side-scroll::-webkit-scrollbar { width: 6px; }
+  .side-scroll::-webkit-scrollbar-thumb { background: #2A2F35; border-radius: 6px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ecg-track, .status-dot.online, .status-dot.checking, .entry, .typing-ecg path { animation: none !important; }
+  }
+</style>
+</head>
+<body class="bg-[#F1F2EC] text-[#16211B]">
+
+<!-- ============================================================ -->
+<!-- LOGIN SCREEN                                                  -->
+<!-- ============================================================ -->
+<div id="loginScreen" class="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 px-4">
+  <div class="w-full max-w-sm">
+    <div class="flex flex-col items-center mb-8">
+      <div class="w-12 h-12 rounded-xl bg-medblue-500 flex items-center justify-center shadow-soft mb-4">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M2 12h4l2-7 4 14 3-10 2 3h5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h1 class="font-serif italic text-2xl text-slate-800">Agentic RAG</h1>
+      <p class="text-xs tracking-wide uppercase text-slate-400 mt-1">Medical AI Assistant</p>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-card border border-slate-100 p-8">
+      <h2 class="text-lg font-semibold text-slate-800 mb-1" id="authTitle">Se connecter</h2>
+      <p class="text-sm text-slate-400 mb-6" id="authSubtitle">Accédez à votre espace de consultation</p>
+
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-500 mb-1.5">Email</label>
+          <input type="email" required value="issra@example.com" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 outline-none transition focus:border-medblue-500 focus:bg-white focus:ring-4 focus:ring-medblue-100" placeholder="vous@exemple.com" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-500 mb-1.5">Mot de passe</label>
+          <input type="password" required value="12345678" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 outline-none transition focus:border-medblue-500 focus:bg-white focus:ring-4 focus:ring-medblue-100" placeholder="••••••••" />
+        </div>
+
+        <div class="flex items-center justify-between text-xs pt-1">
+          <label class="flex items-center gap-2 text-slate-500">
+            <input type="checkbox" class="rounded border-slate-300 text-medblue-500 focus:ring-medblue-400" checked>
+            Se souvenir de moi
+          </label>
+          <a href="#" class="text-medblue-600 hover:text-medblue-700">Mot de passe oublié ?</a>
+        </div>
+
+        <button type="submit" class="w-full mt-2 bg-medblue-500 hover:bg-medblue-600 text-white text-sm font-semibold py-2.5 rounded-xl transition shadow-soft active:scale-[0.99]">
+          Se connecter
+        </button>
+      </form>
+
+      <p class="text-center text-xs text-slate-400 mt-6">
+        Pas encore de compte ?
+        <a href="#" id="createAccountLink" class="text-medblue-600 font-medium hover:text-medblue-700">Créer un compte</a>
+      </p>
+    </div>
+
+    <p class="text-center text-[11px] text-slate-400 mt-6">Informational only — not a substitute for professional medical advice.</p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MAIN APP                                                      -->
+<!-- ============================================================ -->
+<div id="appScreen" class="flex h-screen w-screen overflow-hidden">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="w-72 flex-none bg-side text-slate-200 flex flex-col border-r border-side-line">
+    <div class="p-3">
+      <button id="newChatBtn" class="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-side-line bg-side-soft hover:bg-[#22262C] transition text-sm font-medium">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nouvelle consultation
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto side-scroll px-3 pb-3 space-y-5">
+      <div>
+        <div class="flex items-center gap-1.5 px-2 mb-1.5 text-[11px] uppercase tracking-wider text-slate-500 font-medium">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M16 3l5 5-6 6-2 5-2-2 1-3-6 1 9-9 1-3z"/></svg>
+          Épinglés
+        </div>
+        <button class="w-full text-left px-2.5 py-2 rounded-lg text-sm text-slate-300 hover:bg-side-soft transition truncate">
+          Suivi tension artérielle
+        </button>
+      </div>
+
+      <div>
+        <div class="px-2 mb-1.5 text-[11px] uppercase tracking-wider text-slate-500 font-medium">Récents</div>
+        <div id="recentsContainer" class="flex flex-col"></div>
+        <p id="recentsEmpty" class="px-2.5 py-2 text-xs text-slate-500 italic">Aucune consultation récente</p>
+      </div>
+    </div>
+
+    <div class="p-3 border-t border-side-line">
+      <div class="flex items-center gap-2.5 px-1 py-1.5 rounded-lg">
+        <div class="w-8 h-8 flex-none rounded-full bg-gradient-to-br from-medblue-400 to-phosphor flex items-center justify-center text-[11px] font-semibold text-white">II</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium text-slate-100 truncate">issra isra</div>
+          <div class="text-[11px] text-slate-500 truncate">Compte personnel</div>
+        </div>
+        <button id="logoutBtn" title="Se déconnecter" class="flex-none w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-vital hover:bg-side-soft transition">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN COLUMN -->
+  <div class="flex-1 flex flex-col min-w-0 h-screen">
+
+    <!-- HEADER / MONITOR PANEL -->
+    <header class="flex-none bg-panel border-b border-phosphor/20 pt-4 px-6"
+            style="background-image: linear-gradient(rgba(70,209,144,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(70,209,144,.07) 1px, transparent 1px); background-size: 22px 22px;">
+      <div class="max-w-4xl mx-auto flex items-start justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <button id="sidebarToggle" class="w-8 h-8 rounded-lg border border-phosphor/25 bg-white/[0.02] text-slate-400 hover:text-phosphor-bright hover:border-phosphor flex items-center justify-center transition">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+          </button>
+          <div class="w-8 h-8 rounded-lg border border-phosphor/35 bg-phosphor/10 flex items-center justify-center flex-none">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M2 12h4l2-7 4 14 3-10 2 3h5" stroke="#6BE3AC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div>
+            <div class="font-serif italic text-lg text-slate-100 leading-tight">Agentic RAG</div>
+            <div class="text-[10px] tracking-widest uppercase text-slate-500 mt-0.5">Medical AI Assistant · Cardiovascular RAG</div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-500">
+            <span id="statusDot" class="w-1.5 h-1.5 rounded-full bg-amber-400 status-dot checking"></span>
+            <span id="statusLabel">Connexion…</span>
+          </div>
+          <button id="themeToggle" class="w-8 h-8 rounded-lg border border-phosphor/25 text-slate-400 hover:text-phosphor-bright hover:border-phosphor flex items-center justify-center transition">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          </button>
+          <button id="settingsBtn" class="w-8 h-8 rounded-lg border border-phosphor/25 text-slate-400 hover:text-phosphor-bright hover:border-phosphor flex items-center justify-center transition">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="relative h-9 mt-3 overflow-hidden max-w-4xl mx-auto">
+        <div class="ecg-track absolute top-0 left-0 h-full flex" style="width:200%">
+          <svg viewBox="0 0 460 40" preserveAspectRatio="none" class="h-full w-1/2 flex-none block">
+            <path d="M0,20 L120,20 L134,20 L142,6 L150,34 L158,20 L172,20 L288,20 L302,20 L310,6 L318,34 L326,20 L340,20 L460,20" fill="none" stroke="#3FBF8A" stroke-width="1.3" opacity="0.8"/>
+          </svg>
+          <svg viewBox="0 0 460 40" preserveAspectRatio="none" class="h-full w-1/2 flex-none block">
+            <path d="M0,20 L120,20 L134,20 L142,6 L150,34 L158,20 L172,20 L288,20 L302,20 L310,6 L318,34 L326,20 L340,20 L460,20" fill="none" stroke="#3FBF8A" stroke-width="1.3" opacity="0.8"/>
+          </svg>
+        </div>
+      </div>
+    </header>
+
+    <!-- CHAT / CENTRAL AREA -->
+    <main id="chatMain" class="flex-1 overflow-y-auto px-5 py-8 min-h-0">
+      <div id="chatCol" class="max-w-3xl mx-auto flex flex-col gap-7 pb-4">
+        <div id="emptyState" class="mt-[8vh] text-center">
+          <h2 class="font-serif italic text-3xl md:text-4xl text-[#16211B] mb-8">Que souhaitez-vous comprendre aujourd'hui&nbsp;?</h2>
+          <div class="flex flex-wrap gap-2.5 justify-center">
+            <button class="chip font-mono text-xs border border-[#DEE2D8] bg-white text-[#16211B] px-4 py-2.5 rounded-full hover:border-[#1F8F5E] hover:text-[#1F8F5E] transition shadow-sm" data-q="What is anemia?">What is anemia?</button>
+            <button class="chip font-mono text-xs border border-[#DEE2D8] bg-white text-[#16211B] px-4 py-2.5 rounded-full hover:border-[#1F8F5E] hover:text-[#1F8F5E] transition shadow-sm" data-q="What causes hypertension?">What causes hypertension?</button>
+            <button class="chip font-mono text-xs border border-[#DEE2D8] bg-white text-[#16211B] px-4 py-2.5 rounded-full hover:border-[#1F8F5E] hover:text-[#1F8F5E] transition shadow-sm" data-q="What are the symptoms of arrhythmia?">Symptoms of arrhythmia</button>
+            <button class="chip font-mono text-xs border border-[#DEE2D8] bg-white text-[#16211B] px-4 py-2.5 rounded-full hover:border-[#1F8F5E] hover:text-[#1F8F5E] transition shadow-sm" data-q="How is a heart attack diagnosed?">Heart attack diagnosis</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- COMPOSER -->
+    <div class="flex-none px-5 pb-6 bg-[#F1F2EC]">
+      <div class="max-w-3xl mx-auto">
+        <div class="flex items-end gap-2 bg-white border border-[#DEE2D8] rounded-full pl-6 pr-2 py-2 shadow-[0_10px_30px_-8px_rgba(20,30,25,0.18)] focus-within:border-[#1F8F5E] transition">
+          <textarea id="input" rows="1" placeholder="Ask a question about cardiovascular health…" class="flex-1 resize-none bg-transparent outline-none text-[15px] py-2 max-h-40 placeholder:text-[#8B948C]"></textarea>
+          <button id="sendBtn" aria-label="Envoyer" class="flex-none w-10 h-10 rounded-full bg-[#1F8F5E] hover:bg-[#176B47] text-white flex items-center justify-center transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+        <p class="text-center text-[11px] text-[#8B948C] mt-2.5">Informational only — not a substitute for professional medical advice.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SETTINGS MODAL                                                -->
+<!-- ============================================================ -->
+<div id="modalOverlay" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-5">
+  <div class="bg-white rounded-2xl shadow-card p-6 w-full max-w-sm">
+    <h3 class="font-serif italic text-lg text-slate-800 mb-1">Backend connection</h3>
+    <p class="text-xs text-slate-400 mb-4">Point the interface at your FastAPI <span class="font-mono">/chat</span> endpoint.</p>
+    <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">Endpoint URL</label>
+    <input type="text" id="apiUrlInput" class="w-full font-mono text-sm px-3 py-2.5 rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-[#1F8F5E] mb-5" />
+    <div class="flex justify-end gap-2">
+      <button id="modalCancel" class="text-sm font-medium px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
+      <button id="modalSave" class="text-sm font-medium px-4 py-2 rounded-lg bg-[#1F8F5E] text-white hover:bg-[#176B47]">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // =========================================================
+  // AUTH FLOW (front-end simulation — replace with real auth)
+  // =========================================================
+  const loginScreen = document.getElementById('loginScreen');
+  const appScreen = document.getElementById('appScreen');
+  const loginForm = document.getElementById('loginForm');
+  const logoutBtn = document.getElementById('logoutBtn');
+
+  loginForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    loginScreen.classList.add('fade-out');
+    appScreen.classList.add('visible');
+    setTimeout(() => { loginScreen.style.display = 'none'; }, 500);
+    checkHealth();
+  });
+
+  logoutBtn.addEventListener('click', () => {
+    loginScreen.style.display = 'flex';
+    requestAnimationFrame(() => {
+      loginScreen.classList.remove('fade-out');
+      appScreen.classList.remove('visible');
+    });
+  });
+
+  document.getElementById('createAccountLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    const title = document.getElementById('authTitle');
+    const sub = document.getElementById('authSubtitle');
+    const submitBtn = loginForm.querySelector('button[type="submit"]');
+    const isSignup = title.textContent === 'Créer un compte';
+    title.textContent = isSignup ? 'Se connecter' : 'Créer un compte';
+    sub.textContent = isSignup ? 'Accédez à votre espace de consultation' : 'Rejoignez votre espace de consultation médicale';
+    submitBtn.textContent = isSignup ? 'Se connecter' : 'Créer mon compte';
+    e.target.textContent = isSignup ? 'Créer un compte' : 'Déjà inscrit ? Se connecter';
+  });
+
+  // =========================================================
+  // SIDEBAR TOGGLE + NEW CHAT
+  // =========================================================
+  const sidebar = document.getElementById('sidebar');
+  document.getElementById('sidebarToggle').addEventListener('click', () => {
+    sidebar.classList.toggle('collapsed');
+  });
+  document.getElementById('newChatBtn').addEventListener('click', () => {
+    chatCol.innerHTML = '';
+    chatCol.appendChild(emptyState);
+    emptyState.style.display = 'block';
+  });
+
+  // =========================================================
+  // THEME TOGGLE (affects reading pane only, header stays dark)
+  // =========================================================
+  const themeToggle = document.getElementById('themeToggle');
+  let isDarkMode = false;
+  themeToggle.addEventListener('click', () => {
+    isDarkMode = !isDarkMode;
+    document.body.className = isDarkMode
+      ? 'bg-[#0C1310] text-[#E7EFE8]'
+      : 'bg-[#F1F2EC] text-[#16211B]';
+    document.querySelectorAll('.composer-wrap-bg').forEach(el => {});
+  });
+
+  // =========================================================
+  // CHAT LOGIC
+  // =========================================================
+  let API_URL = "http://localhost:8000/chat";
+
+  const chatCol = document.getElementById('chatCol');
+  const chatMain = document.getElementById('chatMain');
+  const emptyState = document.getElementById('emptyState');
+  const input = document.getElementById('input');
+  const sendBtn = document.getElementById('sendBtn');
+  const statusDot = document.getElementById('statusDot');
+  const statusLabel = document.getElementById('statusLabel');
+  const recentsContainer = document.getElementById('recentsContainer');
+  const recentsEmpty = document.getElementById('recentsEmpty');
+
+  marked.setOptions({ breaks: true });
+
+  function scrollToBottom() { chatMain.scrollTop = chatMain.scrollHeight; }
+  function timeNow() { return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function addToRecents(question) {
+    if (!recentsContainer) return;
+    recentsEmpty.style.display = 'none';
+    const btn = document.createElement('button');
+    btn.className = 'w-full text-left px-2.5 py-2 rounded-lg text-sm text-slate-300 hover:bg-side-soft transition truncate';
+    btn.textContent = question.length > 42 ? question.slice(0, 42) + '…' : question;
+    btn.title = question;
+    recentsContainer.prepend(btn);
+  }
+
+  function addMessage(role, text, isError = false) {
+    if (emptyState && emptyState.style.display !== 'none') emptyState.style.display = 'none';
+    const entry = document.createElement('div');
+    entry.className = 'entry ' + (role === 'user'
+      ? 'max-w-[80%] ml-auto text-right pr-3.5 border-r-2 border-[#DEE2D8]'
+      : 'max-w-[92%] pl-4 border-l-2 ' + (isError ? 'border-vital' : 'border-[#1F8F5E]'));
+    const label = role === 'user' ? 'Vous' : (isError ? 'Connexion' : 'Réponse');
+    const metaJustify = role === 'user' ? 'justify-end' : '';
+    entry.innerHTML = `
+      <div class="flex items-center gap-2 font-mono text-[10.5px] tracking-wide uppercase text-[#8B948C] mb-1.5 ${metaJustify}">
+        <span>${role === 'user' ? timeNow() : label}</span><span>${role === 'user' ? label : timeNow()}</span>
+      </div>
+      <div class="prose-msg text-[15.5px] leading-relaxed ${isError ? 'text-vital' : ''}">${role === 'assistant' ? marked.parse(text) : `<p>${escapeHtml(text)}</p>`}</div>
+    `;
+    chatCol.appendChild(entry);
+    scrollToBottom();
+  }
+
+  function addTypingIndicator() {
+    const entry = document.createElement('div');
+    entry.className = 'entry max-w-[92%] pl-4 border-l-2 border-[#1F8F5E]';
+    entry.id = 'typingRow';
+    entry.innerHTML = `
+      <div class="font-mono text-[10.5px] tracking-wide uppercase text-[#8B948C] mb-1.5">Réponse</div>
+      <div class="flex items-center gap-2.5">
+        <svg class="typing-ecg" width="56" height="18" viewBox="0 0 60 20" preserveAspectRatio="none"><path d="M0,10 L14,10 L18,2 L22,18 L26,10 L60,10"/></svg>
+        <span class="font-mono text-[11.5px] tracking-wide text-[#8B948C]">analyse en cours…</span>
+      </div>`;
+    chatCol.appendChild(entry);
+    scrollToBottom();
+  }
+  function removeTypingIndicator() {
+    const row = document.getElementById('typingRow');
+    if (row) row.remove();
+  }
+
+  async function sendMessage(question) {
+    if (!question.trim()) return;
+    addMessage('user', question);
+    addToRecents(question);
+    input.value = ''; input.style.height = 'auto';
+    sendBtn.disabled = true;
+    addTypingIndicator();
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
+      });
+      if (!res.ok) throw new Error('Server responded with ' + res.status);
+      const data = await res.json();
+      removeTypingIndicator();
+      addMessage('assistant', data.answer ?? 'No answer returned.');
+      setStatus('online');
+    } catch (err) {
+      removeTypingIndicator();
+      addMessage('assistant', `Impossible de joindre le backend à \`${API_URL}\`. Vérifiez que votre serveur FastAPI est démarré. (${err.message})`, true);
+      setStatus('offline');
+    } finally {
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  sendBtn.addEventListener('click', () => sendMessage(input.value));
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input.value); } });
+  input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 160) + 'px'; });
+  document.querySelectorAll('.chip').forEach(chip => chip.addEventListener('click', () => sendMessage(chip.dataset.q)));
+
+  // =========================================================
+  // SETTINGS MODAL
+  // =========================================================
+  const modalOverlay = document.getElementById('modalOverlay');
+  const apiUrlInput = document.getElementById('apiUrlInput');
+  document.getElementById('settingsBtn').addEventListener('click', () => {
+    apiUrlInput.value = API_URL;
+    modalOverlay.classList.remove('hidden'); modalOverlay.classList.add('flex');
+    apiUrlInput.focus();
+  });
+  document.getElementById('modalCancel').addEventListener('click', () => { modalOverlay.classList.add('hidden'); modalOverlay.classList.remove('flex'); });
+  modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) { modalOverlay.classList.add('hidden'); modalOverlay.classList.remove('flex'); } });
+  document.getElementById('modalSave').addEventListener('click', () => {
+    if (apiUrlInput.value.trim()) { API_URL = apiUrlInput.value.trim(); checkHealth(); }
+    modalOverlay.classList.add('hidden'); modalOverlay.classList.remove('flex');
+  });
+
+  // =========================================================
+  // CONNECTION STATUS
+  // =========================================================
+  function setStatus(state) {
+    statusDot.className = 'w-1.5 h-1.5 rounded-full status-dot ' + state + ' ' +
+      (state === 'online' ? 'bg-phosphor-bright' : state === 'offline' ? 'bg-vital' : 'bg-amber-400');
+    statusLabel.textContent = state === 'online' ? 'Connecté' : state === 'offline' ? 'Hors ligne' : 'Connexion…';
+  }
+  async function checkHealth() {
+    setStatus('checking');
+    try {
+      const healthUrl = API_URL.replace(/\/chat\/?$/, '/health');
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 2500);
+      const res = await fetch(healthUrl, { signal: controller.signal });
+      clearTimeout(t);
+      setStatus(res.ok ? 'online' : 'offline');
+    } catch (e) { setStatus('offline'); }
+  }
+</script>
+
+</body>
+</html>

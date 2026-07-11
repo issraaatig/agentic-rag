@@ -16,7 +16,6 @@ print(f"🔗 vector.py -> Connexion à Ollama sur : {OLLAMA_BASE_URL}")
 # 2. DATA LOADING & PREPARATION
 # ==========================================
 print("📖 Lecture du CSV...")
-import os
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 csv_path = os.path.join(BASE_DIR, "data", "medquad_cvd_final.csv")
@@ -40,8 +39,8 @@ print(f"✅ {len(documents)} documents créés")
 # ==========================================
 print("🔪 Découpage en chunks...")
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=500,       
-    chunk_overlap=75,     
+    chunk_size=500,
+    chunk_overlap=75,
     length_function=len
 )
 chunks = text_splitter.split_documents(documents)
@@ -56,11 +55,14 @@ embeddings = OllamaEmbeddings(
     base_url=OLLAMA_BASE_URL
 )
 
-# ==== CRÉATION DU CLIENT CHROMA (LA PARTIE QUI MANQUAIT) ====
-print("💾 Création du client Chroma...")
+# ==== CRÉATION DU CLIENT CHROMA ====
+PERSIST_DIR = os.path.join(BASE_DIR, "data", "chroma_db_fresh")
+print(f"💾 CHEMIN UTILISÉ POUR CHROMA : {PERSIST_DIR}")
+
 vector_store = Chroma(
-    persist_directory="/app/chroma_db",
-    embedding_function=embeddings
+    persist_directory=PERSIST_DIR,
+    embedding_function=embeddings,
+    collection_name="medquad_cv"
 )
 
 # ==== TRAITEMENT PAR LOTS DE 50 ====
@@ -76,13 +78,16 @@ for i in range(0, total, BATCH_SIZE):
     except Exception as e:
         print(f"   ❌ Erreur sur le lot {i//BATCH_SIZE + 1}: {e}")
         raise
-    # Petit délai pour ne pas saturer Ollama
     time.sleep(0.5)
 
-print("✅ Base vectorielle créée avec succès dans /app/chroma_db")
+print(f"✅ TERMINÉ - Base vectorielle créée dans {PERSIST_DIR}")
+print(f"✅ Collection : medquad_cv")
 
-# ==========================================
-# 5. RETRIEVER (Optionnel)
-# ==========================================
+try:
+    count = vector_store._collection.count()
+    print(f"📊 NOMBRE TOTAL DE DOCUMENTS : {count}")
+except Exception as e:
+    print(f"⚠️ Impossible de vérifier le count : {e}")
+
 retriever = vector_store.as_retriever(search_kwargs={"k": 5})
 print("🔍 Retriever configuré avec k=5")
