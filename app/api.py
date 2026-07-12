@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # --- Import depuis le même package (app/) -----------------------------
-from main import get_answer_fast  # main.py est dans le même dossier app/
+from .main import get_answer_fast  # main.py est dans le même dossier app/
 
 app = FastAPI(title="Agentic RAG API")
 
