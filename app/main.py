@@ -13,9 +13,14 @@ from langchain_core.output_parsers import StrOutputParser
 import traceback
 
 # Imports modules perso (faire import config seulement si j'exucute dans terminal )
-from app import config
-from app import prompts
-from app import metrics
+try:
+    from app import config
+    from app import prompts
+    from app import metrics
+except ImportError:
+    import config
+    import prompts
+    import metrics
 
 
 # =========================
@@ -57,6 +62,8 @@ def get_answer_fast(query: str) -> str:
         final_answer = ""
         for chunk in rag_chain.stream(query):
             final_answer += chunk
+        # Nettoyage de sécurité si le modèle ajoute quand même un score
+        final_answer = final_answer.split("Confidence Score")[0].strip()
         return final_answer
         print("\n" + "=" * 60)
         print(f"QUESTION : {query}")

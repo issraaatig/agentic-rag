@@ -15,9 +15,12 @@ RUN pip install --no-cache-dir -r requirements-base.txt
 COPY requirements-metrics.txt .
 RUN pip install --no-cache-dir -r requirements-metrics.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 3. Copie du code
+# 3. Copie du code (inclut désormais api.py, au même niveau que main.py)
 COPY . .
 
 EXPOSE 8000
 
-CMD ["python", "main.py"]
+# Lance le serveur FastAPI au lieu du mode terminal interactif.
+# --host 0.0.0.0 est OBLIGATOIRE : sans ça, le serveur n'écoute que
+# l'intérieur du conteneur et reste injoignable depuis l'extérieur.
+CMD ["python", "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
