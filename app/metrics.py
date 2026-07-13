@@ -58,21 +58,4 @@ def calculate_lexical_f1(reference_text, candidate_text):
 
 
 def calculate_bert_score(reference_text, candidate_text):
-    """
-    Calcule le score BERT-F1.
-    """
-
-    try:
-        _, _, F1 = bert_score_func(
-            [candidate_text],
-            [reference_text],
-            model_type="distilbert-base-uncased",
-            lang="en",
-            verbose=False
-        )
-
-        return float(F1.item())
-
-    except Exception as e:
-        print(f"BERTScore Error: {e}")
-        return 0.0
+    return 0.0

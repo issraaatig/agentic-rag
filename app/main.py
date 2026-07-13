@@ -161,10 +161,7 @@ def process_question(query: str):
             final_answer
         )
 
-        bert_f1 = metrics.calculate_bert_score(
-            context_combined,
-            final_answer
-        )
+        
 
         # =========================
         # RETURN (IMPORTANT)
@@ -178,7 +175,6 @@ def process_question(query: str):
                 "context_recall": context_recall,
                 "faithfulness": faith_score,
                 "answer_relevance": answer_relevance,
-                "bert_f1": bert_f1,
                 "lexical_f1": lexical_f1
             },
             "docs": [d.page_content for d in docs]
